@@ -32,9 +32,9 @@ with workflow:
    token profiles found; “Processed” is the number of new, non-duplicate pairs researched.
 4. **Triage Opportunities.** Sort mentally by **Qualified**, then **Score**, while checking
    liquidity, age, volume, and the balance between buys and sells.
-5. **Inspect the token.** Select a row below the table. Read its score breakdown, every
-   rejection reason, and every unknown check. Open DEX Screener and Solscan from the supplied
-   links and verify the contract address.
+5. **Inspect the token carousel.** It advances automatically every six seconds. Pause it when
+   a token needs more attention, then read its score breakdown, rejection reasons, and unknown
+   checks. Open DEX Screener and Solscan from the supplied links and verify the contract address.
 6. **Treat Discord as a prompt to research.** An alert means the pair passed the configured
    rules at scan time. It does not mean conditions remain unchanged.
 7. **Review outcomes.** Use **Alert History** to compare the initial price with current price,
