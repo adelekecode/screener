@@ -36,6 +36,7 @@ class OpportunityRead(ORMModel):
     score_breakdown: dict[str, Any]
     first_seen_at: datetime
     last_seen_at: datetime
+    last_scan_id: UUID | None
 
 
 class ScanRead(ORMModel):

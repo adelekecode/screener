@@ -1,23 +1,38 @@
-from datetime import UTC, datetime
-
 import pandas as pd
 import streamlit as st
 
 from api_client import APIError, get
+from time_utils import friendly_utc_timestamp, humanize_timestamp
 
 st.set_page_config(page_title="Opportunities · Screener", page_icon="📊", layout="wide")
 st.title("📊 Opportunities")
 
-f1, f2, f3 = st.columns([1, 1, 2])
-qualified_only = f1.toggle("Qualified only")
-min_score = f2.slider("Minimum score", 0, 100, 0)
-search = f3.text_input("Search token, symbol, or pair")
+try:
+    scans = get("/api/scans", limit=100)
+except APIError as exc:
+    st.error(str(exc))
+    st.stop()
+
+scan_options = {"All scans": None}
+for scan in scans:
+    label = (
+        f"{humanize_timestamp(scan['started_at'])} · {scan['status']} · "
+        f"{scan['qualified_count']} qualified"
+    )
+    scan_options[label] = scan["id"]
+
+f1, f2, f3, f4 = st.columns([1.4, 1, 1, 2])
+scan_label = f1.selectbox("Scan", options=list(scan_options.keys()))
+qualified_only = f2.toggle("Qualified only")
+min_score = f3.slider("Minimum score", 0, 100, 0)
+search = f4.text_input("Search token, symbol, or pair")
 
 try:
     rows = get(
         "/api/opportunities",
         qualified=True if qualified_only else None,
         min_score=min_score or None,
+        scan_id=scan_options[scan_label],
         limit=500,
     )
 except APIError as exc:
@@ -47,17 +62,12 @@ if not rows:
 display_rows = []
 for row in rows:
     created = row.get("pair_created_at")
-    age = None
-    if created:
-        age = round(
-            (datetime.now(UTC) - datetime.fromisoformat(created)).total_seconds() / 60
-        )
     display_rows.append(
         {
             "Token": row["symbol"],
             "Score": row["score"],
             "Qualified": row["qualified"],
-            "Age (min)": age,
+            "Created": humanize_timestamp(created),
             "Market cap": row["market_cap_usd"],
             "Liquidity": row["liquidity_usd"],
             "5m volume": row["volume_5m_usd"],
@@ -71,6 +81,9 @@ st.dataframe(
     hide_index=True,
     use_container_width=True,
     column_config={
+        "Created": st.column_config.TextColumn(
+            help="How long ago DEX Screener reports that the pair was created."
+        ),
         "Market cap": st.column_config.NumberColumn(format="$%.0f"),
         "Liquidity": st.column_config.NumberColumn(format="$%.0f"),
         "5m volume": st.column_config.NumberColumn(format="$%.0f"),
@@ -93,6 +106,14 @@ m1.metric("Score", f"{item['score']}/100")
 m2.metric("Price", f"${item['price_usd'] or 0:,.8f}")
 m3.metric("Market cap", f"${item['market_cap_usd'] or 0:,.0f}")
 m4.metric("Liquidity", f"${item['liquidity_usd'] or 0:,.0f}")
+if item.get("pair_created_at"):
+    st.caption(
+        f"Pair created {humanize_timestamp(item['pair_created_at'])} · "
+        f"{friendly_utc_timestamp(item['pair_created_at'])} · "
+        "This is the DEX pair creation time, not necessarily the token mint time."
+    )
+else:
+    st.caption("Pair creation time was not supplied by DEX Screener.")
 
 left, right = st.columns(2)
 with left:
@@ -117,4 +138,3 @@ st.markdown(
     f"[Jupiter](https://jup.ag/swap/SOL-{token})"
 )
 st.code(token, language=None)
-

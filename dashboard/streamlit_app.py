@@ -1,9 +1,8 @@
-from datetime import datetime
-
 import pandas as pd
 import streamlit as st
 
 from api_client import APIError, get, post
+from time_utils import friendly_utc_timestamp, humanize_timestamp
 
 st.set_page_config(
     page_title="Screener",
@@ -60,8 +59,10 @@ else:
     b.metric("Discovered tokens", last_scan["discovered_count"])
     c.metric("Pairs processed", last_scan["processed_count"])
     d.metric("Alerts sent", last_scan["alerted_count"])
-    started = datetime.fromisoformat(last_scan["started_at"]).astimezone()
-    st.caption(f"Started {started:%Y-%m-%d %H:%M:%S %Z}")
+    st.caption(
+        f"Started {humanize_timestamp(last_scan['started_at'])} · "
+        f"{friendly_utc_timestamp(last_scan['started_at'])}"
+    )
     if last_scan.get("error"):
         st.error(last_scan["error"])
 
@@ -70,22 +71,44 @@ try:
     rows = get("/api/opportunities", limit=10)
     if rows:
         frame = pd.DataFrame(rows)
+        frame["pair_created_at"] = frame["pair_created_at"].map(humanize_timestamp)
+        recent = frame[
+            [
+                "symbol",
+                "score",
+                "qualified",
+                "pair_created_at",
+                "market_cap_usd",
+                "liquidity_usd",
+                "volume_5m_usd",
+                "buys_5m",
+                "sells_5m",
+            ]
+        ].rename(
+            columns={
+                "symbol": "Token",
+                "score": "Score",
+                "qualified": "Qualified",
+                "pair_created_at": "Created",
+                "market_cap_usd": "Market cap",
+                "liquidity_usd": "Liquidity",
+                "volume_5m_usd": "5m volume",
+                "buys_5m": "Buys",
+                "sells_5m": "Sells",
+            }
+        )
         st.dataframe(
-            frame[
-                [
-                    "symbol",
-                    "score",
-                    "qualified",
-                    "market_cap_usd",
-                    "liquidity_usd",
-                    "volume_5m_usd",
-                    "buys_5m",
-                    "sells_5m",
-                    "last_seen_at",
-                ]
-            ],
+            recent,
             hide_index=True,
             use_container_width=True,
+            column_config={
+                "Created": st.column_config.TextColumn(
+                    help="How long ago DEX Screener reports that the pair was created."
+                ),
+                "Market cap": st.column_config.NumberColumn(format="$%.0f"),
+                "Liquidity": st.column_config.NumberColumn(format="$%.0f"),
+                "5m volume": st.column_config.NumberColumn(format="$%.0f"),
+            },
         )
     else:
         st.info("Newly discovered pairs will appear here after the first scan.")
@@ -96,4 +119,3 @@ st.warning(
     "This dashboard is a research assistant, not a buy signal. Memecoins can lose all "
     "their value; verify every contract and trade manually."
 )
-

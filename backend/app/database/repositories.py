@@ -60,12 +60,15 @@ def _opportunity_query(
     *,
     qualified: bool | None = None,
     min_score: int | None = None,
+    scan_id: UUID | None = None,
 ) -> Select[tuple[Opportunity]]:
     query = select(Opportunity)
     if qualified is not None:
         query = query.where(Opportunity.qualified.is_(qualified))
     if min_score is not None:
         query = query.where(Opportunity.score >= min_score)
+    if scan_id is not None:
+        query = query.where(Opportunity.last_scan_id == scan_id)
     return query.order_by(Opportunity.last_seen_at.desc())
 
 
@@ -74,10 +77,11 @@ async def list_opportunities(
     *,
     qualified: bool | None = None,
     min_score: int | None = None,
+    scan_id: UUID | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[Opportunity]:
-    query = _opportunity_query(qualified=qualified, min_score=min_score)
+    query = _opportunity_query(qualified=qualified, min_score=min_score, scan_id=scan_id)
     result = await session.scalars(query.limit(limit).offset(offset))
     return list(result)
 

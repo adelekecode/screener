@@ -57,6 +57,9 @@ class Opportunity(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), index=True
     )
+    last_scan_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("scans.id"), index=True
+    )
     alerts: Mapped[list["Alert"]] = relationship(back_populates="opportunity")
 
 

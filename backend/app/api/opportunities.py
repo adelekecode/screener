@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ async def opportunities(
     session: Session,
     qualified: bool | None = None,
     min_score: int | None = Query(default=None, ge=0, le=100),
+    scan_id: UUID | None = None,
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[OpportunityRead]:
@@ -23,6 +25,7 @@ async def opportunities(
         session,
         qualified=qualified,
         min_score=min_score,
+        scan_id=scan_id,
         limit=limit,
         offset=offset,
     )

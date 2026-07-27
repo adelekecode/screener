@@ -91,10 +91,10 @@ with table_guide:
             "Watch out for": "Qualification is a snapshot. Liquidity and permissions can change.",
         },
         {
-            "Column": "Age (min)",
-            "What it is": "Minutes since the pair's reported creation time.",
-            "How to read it": "The pair must sit inside the configured minimum and maximum age window.",
-            "Watch out for": "Pair age is not token age; the same token can trade in multiple pools.",
+            "Column": "Created",
+            "What it is": "The liquidity pair creation timestamp reported by DEX Screener.",
+            "How to read it": "Shown as relative time, such as “12 min ago” or “3 hrs ago.”",
+            "Watch out for": "This is not necessarily the token mint time; one token can have several pairs.",
         },
         {
             "Column": "Market cap",
@@ -309,4 +309,3 @@ Before making any decision outside this app:
         "slippage, fees, taxes, failed transactions, or whether the quoted liquidity could support "
         "your position size."
     )
-

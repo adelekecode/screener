@@ -108,6 +108,7 @@ class ScannerService:
                         risk_flags=risk_flags,
                         rejection_reasons=rejection_reasons,
                         qualified=qualified,
+                        last_scan_id=scan.id,
                     )
                     opportunity = await repositories.upsert_opportunity(
                         session, db_values
@@ -249,6 +250,7 @@ class ScannerService:
         risk_flags: list[str],
         rejection_reasons: list[str],
         qualified: bool,
+        last_scan_id: Any,
     ) -> dict[str, Any]:
         columns = {
             "pair_address",
@@ -280,6 +282,7 @@ class ScannerService:
                 "risk_flags": risk_flags,
                 "rejection_reasons": rejection_reasons,
                 "qualified": qualified,
+                "last_scan_id": last_scan_id,
             }
         )
         return values
