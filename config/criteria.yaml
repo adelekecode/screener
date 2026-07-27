@@ -1,0 +1,16 @@
+chain: solana
+maximum_pair_age_minutes: 60
+minimum_pair_age_minutes: 10
+minimum_liquidity_usd: 20000
+maximum_market_cap_usd: 2000000
+minimum_market_cap_usd: 50000
+minimum_volume_10m_usd: 5000
+minimum_buys_10m: 30
+minimum_unique_buyers_10m: 15
+minimum_buy_sell_ratio: 1.5
+maximum_top_10_holder_percentage: 30
+maximum_creator_percentage: 5
+require_mint_authority_revoked: true
+require_freeze_authority_revoked: true
+minimum_score_for_alert: 70
+
