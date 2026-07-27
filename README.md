@@ -36,11 +36,11 @@ quiet rather than guess. That silence is the feature.
 - Bounded-concurrency pipeline: pair discovery and Solana risk checks run
   in parallel (semaphore-limited, tunable via `SCAN_CONCURRENCY`), not one
   candidate at a time
-- Redis distributed lock, processed-pair cache, and alert deduplication
+- Redis distributed lock, temporary candidate watchlist, and alert deduplication
 - DEX Screener discovery and live pair metrics
 - Solana RPC checks for mint authority, freeze authority, and largest-holder concentration
 - Conservative filters feeding a transparent, fully-explained 100-point score
-- PostgreSQL history for every scan, opportunity, setting, and Discord attempt
+- PostgreSQL history for every scan, score-threshold opportunity, setting, and Discord attempt
 - Periodic price tracking: current price, maximum gain, maximum decline
 - Streamlit views for overview, opportunities, token inspection, alerts, scans, and configuration
 - Alembic migrations, Docker Compose, and a real unit test suite
@@ -87,6 +87,7 @@ To intentionally delete local database and Redis data, use
 | `GET` | `/health` | API, PostgreSQL, Redis, and scanner state |
 | `GET` | `/api/opportunities` | Filterable opportunity list |
 | `GET` | `/api/opportunities/{pair_address}` | Opportunity detail |
+| `POST` | `/api/opportunities/{pair_address}/send-to-discord` | Manually send and monitor a stored pair |
 | `GET` | `/api/alerts` | Discord delivery history |
 | `POST` | `/api/alerts/{id}/resend` | Retry a stored alert |
 | `GET` | `/api/scans` | Scan history |
@@ -107,6 +108,15 @@ unique buyer counts, or a 10-minute metric bucket. Screener discovers Solana
 tokens from its latest token-profile feed and retrieves their pairs. It uses the
 available five-minute volume and transaction bucket as a conservative lower
 bound for the configured recent-activity threshold.
+
+Freshly discovered tokens remain on a Redis watchlist for at least the configured
+pair-age window and are rescored on each scheduled scan. A token that starts
+below the threshold can therefore be promoted later if its data improves.
+PostgreSQL stores only candidates whose score meets `minimum_score_for_alert`
+(70 by default). Passing that score controls persistence; Discord still requires
+the candidate to pass every hard safety filter. Historical rows linked to an
+alert are retained even if the threshold is later raised. An unalerted token
+that later falls below the threshold is removed from the opportunity table.
 
 Unavailable data is never converted to a safe result — see
 [Why Screener is built this way](#why-screener-is-built-this-way) above.

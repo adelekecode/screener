@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +54,32 @@ async def upsert_opportunity(session: AsyncSession, values: dict[str, Any]) -> O
     opportunity = (await session.execute(statement)).scalar_one()
     await session.commit()
     return opportunity
+
+
+async def delete_below_score_without_alerts(
+    session: AsyncSession,
+    minimum_score: int,
+    *,
+    current_below_threshold: list[str] | None = None,
+) -> int:
+    has_alert = (
+        select(Alert.id)
+        .where(Alert.pair_address == Opportunity.pair_address)
+        .exists()
+    )
+    below_threshold = [Opportunity.score < minimum_score]
+    if current_below_threshold:
+        below_threshold.append(
+            Opportunity.pair_address.in_(current_below_threshold)
+        )
+    result = await session.execute(
+        delete(Opportunity).where(
+            or_(*below_threshold),
+            ~has_alert,
+        )
+    )
+    await session.commit()
+    return result.rowcount or 0
 
 
 def _opportunity_query(

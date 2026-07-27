@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class ScannerService:
     lock_key = "scanner:scan-lock"
     paused_key = "scanner:paused"
+    watchlist_key = "scanner:watched-tokens"
 
     def __init__(
         self,
@@ -80,12 +81,16 @@ class ScannerService:
                     session, "criteria", default={}
                 )
                 criteria = self.settings.load_criteria(criteria_overrides)
-                tokens = await self.dexscreener.discover_solana_tokens()
-                discovered_count = len(tokens)
+                discovered_tokens = await self.dexscreener.discover_solana_tokens()
+                discovered_count = len(discovered_tokens)
+                tokens = await self._tokens_for_scan(
+                    discovered_tokens,
+                    watch_minutes=criteria.maximum_pair_age_minutes,
+                )
 
                 candidates = await self._collect_candidates(tokens)
-                candidates = await self._filter_unprocessed(candidates)
                 checks_by_pair = await self._run_checks(candidates)
+                below_threshold_pairs: list[str] = []
 
                 for candidate in candidates:
                     pair_address = candidate["pair_address"]
@@ -100,28 +105,32 @@ class ScannerService:
                     if score < criteria.minimum_score_for_alert:
                         rejection_reasons.append("Score is below the alert threshold")
 
-                    db_values = self._database_values(
-                        candidate,
-                        checks=checks,
-                        score=score,
-                        score_breakdown=breakdown,
-                        risk_flags=risk_flags,
-                        rejection_reasons=rejection_reasons,
-                        qualified=qualified,
-                        last_scan_id=scan.id,
-                    )
-                    opportunity = await repositories.upsert_opportunity(
-                        session, db_values
-                    )
                     processed_count += 1
-                    await self.redis.set(
-                        f"processed:{pair_address}",
-                        "1",
-                        ex=self.settings.processed_ttl_seconds,
-                    )
+
+                    opportunity = None
+                    if score >= criteria.minimum_score_for_alert:
+                        db_values = self._database_values(
+                            candidate,
+                            checks=checks,
+                            score=score,
+                            score_breakdown=breakdown,
+                            risk_flags=risk_flags,
+                            rejection_reasons=rejection_reasons,
+                            qualified=qualified,
+                            last_scan_id=scan.id,
+                        )
+                        opportunity = await repositories.upsert_opportunity(
+                            session, db_values
+                        )
+                    else:
+                        below_threshold_pairs.append(pair_address)
 
                     if qualified:
                         qualified_count += 1
+                        if opportunity is None:
+                            raise RuntimeError(
+                                "Qualified opportunity was not persisted"
+                            )
                         alert_key = f"alerted:{pair_address}"
                         if not await self.redis.exists(alert_key):
                             result = await self.notifier.send(
@@ -143,6 +152,18 @@ class ScannerService:
                                     "1",
                                     ex=self.settings.processed_ttl_seconds,
                                 )
+
+                removed_count = await repositories.delete_below_score_without_alerts(
+                    session,
+                    criteria.minimum_score_for_alert,
+                    current_below_threshold=below_threshold_pairs,
+                )
+                if removed_count:
+                    logger.info(
+                        "Removed %s stored opportunities below score %s",
+                        removed_count,
+                        criteria.minimum_score_for_alert,
+                    )
 
                 await repositories.finish_scan(
                     session,
@@ -207,20 +228,34 @@ class ScannerService:
                     candidates[pair_address] = candidate
         return list(candidates.values())
 
-    async def _filter_unprocessed(
-        self, candidates: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        if not candidates:
-            return []
-        pipeline = self.redis.pipeline()
-        for candidate in candidates:
-            pipeline.exists(f"processed:{candidate['pair_address']}")
-        already_processed = await pipeline.execute()
-        return [
-            candidate
-            for candidate, processed in zip(candidates, already_processed)
-            if not processed
+    async def _tokens_for_scan(
+        self,
+        discovered_tokens: list[str],
+        *,
+        watch_minutes: int,
+    ) -> list[str]:
+        """Combine fresh discovery with low-score tokens still inside the age window."""
+        now = datetime.now(UTC).timestamp()
+        expires_at = now + max(
+            watch_minutes * 60,
+            self.settings.scan_interval_minutes * 120,
+        )
+        if discovered_tokens:
+            await self.redis.zadd(
+                self.watchlist_key,
+                {token: expires_at for token in discovered_tokens},
+                nx=True,
+            )
+        watched = await self.redis.zrangebyscore(
+            self.watchlist_key,
+            now,
+            "+inf",
+        )
+        await self.redis.zremrangebyscore(self.watchlist_key, "-inf", now)
+        normalized = [
+            token.decode() if isinstance(token, bytes) else token for token in watched
         ]
+        return list(dict.fromkeys([*discovered_tokens, *normalized]))
 
     async def _run_checks(
         self, candidates: list[dict[str, Any]]

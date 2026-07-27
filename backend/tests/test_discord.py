@@ -26,3 +26,17 @@ def test_discord_payload_contains_safety_disclaimer_and_links() -> None:
     assert "dexscreener.com/solana/pair" in payload["content"]
     assert len(payload["content"]) <= 2000
 
+
+def test_manual_discord_payload_is_clearly_labelled() -> None:
+    payload = DiscordNotifier.build_payload(
+        {
+            "score": 72,
+            "symbol": "WATCH",
+            "token_address": "mint",
+            "pair_address": "pair",
+        },
+        manual=True,
+    )
+
+    assert "MANUAL MONITOR" in payload["content"]
+    assert "automatic safety criteria may not have passed" in payload["content"]

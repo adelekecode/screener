@@ -3,7 +3,7 @@ import time
 import pandas as pd
 import streamlit as st
 
-from api_client import APIError, get
+from api_client import APIError, get, post
 from time_utils import friendly_utc_timestamp, humanize_timestamp
 
 st.set_page_config(page_title="Opportunities · Screener", page_icon="📊", layout="wide")
@@ -99,6 +99,23 @@ def move_carousel(step: int) -> None:
     st.session_state.carousel_last_advance = time.time()
 
 
+def send_pair_to_discord(pair_address: str) -> None:
+    try:
+        post(f"/api/opportunities/{pair_address}/send-to-discord")
+        st.session_state.discord_monitor_result = (
+            pair_address,
+            True,
+            "Sent to Discord and added to performance monitoring.",
+        )
+    except APIError as exc:
+        st.session_state.discord_monitor_result = (
+            pair_address,
+            False,
+            str(exc),
+        )
+    st.session_state.carousel_last_advance = time.time()
+
+
 @st.fragment(run_every="6s")
 def token_carousel() -> None:
     if "carousel_index" not in st.session_state:
@@ -182,6 +199,21 @@ def token_carousel() -> None:
         f"[Solscan](https://solscan.io/token/{token}) · "
         f"[Jupiter](https://jup.ag/swap/SOL-{token})"
     )
+    st.button(
+        "📨 Send to Discord & monitor",
+        type="primary",
+        use_container_width=True,
+        key=f"send_to_discord_{pair}",
+        on_click=send_pair_to_discord,
+        args=(pair,),
+        help="Manual override: sends this pair even if it did not pass every automatic filter.",
+    )
+    result = st.session_state.get("discord_monitor_result")
+    if result and result[0] == pair:
+        if result[1]:
+            st.success(result[2])
+        else:
+            st.error(result[2])
     st.code(token, language=None)
 
 

@@ -18,7 +18,9 @@ class DiscordNotifier:
         self.webhook_url = webhook_url
 
     @staticmethod
-    def build_payload(opportunity: dict[str, Any]) -> dict[str, str]:
+    def build_payload(
+        opportunity: dict[str, Any], *, manual: bool = False
+    ) -> dict[str, str]:
         checks = opportunity.get("checks") or {}
         flags = opportunity.get("risk_flags") or []
         buys = opportunity.get("buys_10m")
@@ -26,9 +28,19 @@ class DiscordNotifier:
         token = opportunity.get("token_address", "")
         pair = opportunity.get("pair_address", "")
         symbol = opportunity.get("symbol", "UNKNOWN")
+        heading = (
+            f"🔵 **MANUAL MONITOR — SCORE {opportunity.get('score', 0)}/100**"
+            if manual
+            else f"🟡 **NEW TOKEN OPPORTUNITY — SCORE {opportunity.get('score', 0)}/100**"
+        )
         lines = [
-            f"🟡 **NEW TOKEN OPPORTUNITY — SCORE {opportunity.get('score', 0)}/100**",
+            heading,
             "",
+            *(
+                ["⚠️ Manually selected; automatic safety criteria may not have passed.", ""]
+                if manual
+                else []
+            ),
             f"**Token:** {symbol}",
             f"**Market cap:** ${opportunity.get('market_cap_usd') or 0:,.0f}",
             f"**Liquidity:** ${opportunity.get('liquidity_usd') or 0:,.0f}",
@@ -58,9 +70,13 @@ class DiscordNotifier:
         return {"content": "\n".join(lines)[:2000]}
 
     async def send(
-        self, opportunity: dict[str, Any], payload: dict[str, Any] | None = None
+        self,
+        opportunity: dict[str, Any],
+        payload: dict[str, Any] | None = None,
+        *,
+        manual: bool = False,
     ) -> NotificationResult:
-        message = payload or self.build_payload(opportunity)
+        message = payload or self.build_payload(opportunity, manual=manual)
         if not self.webhook_url:
             return NotificationResult(False, None, "Discord webhook is not configured", message)
         try:
@@ -73,4 +89,3 @@ class DiscordNotifier:
             )
         except httpx.HTTPError as exc:
             return NotificationResult(False, None, str(exc), message)
-

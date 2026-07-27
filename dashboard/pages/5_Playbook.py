@@ -29,14 +29,15 @@ with workflow:
    running for its scheduled interval. The Redis lock prevents two scans from processing at
    the same time.
 3. **Check Scan History.** Confirm the latest scan completed. “Discovered” is the number of
-   token profiles found; “Processed” is the number of new, non-duplicate pairs researched.
+   fresh token profiles found; “Processed” includes fresh and watched pairs rescored that cycle.
 4. **Triage Opportunities.** Sort mentally by **Qualified**, then **Score**, while checking
    liquidity, age, volume, and the balance between buys and sells.
 5. **Inspect the token carousel.** It advances automatically every six seconds. Pause it when
    a token needs more attention, then read its score breakdown, rejection reasons, and unknown
    checks. Open DEX Screener and Solscan from the supplied links and verify the contract address.
-6. **Treat Discord as a prompt to research.** An alert means the pair passed the configured
-   rules at scan time. It does not mean conditions remain unchanged.
+6. **Treat Discord as a prompt to research.** An automatic alert means the pair passed the
+   configured rules at scan time. You can also use **Send to Discord & monitor** on any stored
+   opportunity as a clearly labeled manual override. Conditions can still change afterward.
 7. **Review outcomes.** Use **Alert History** to compare the initial price with current price,
    maximum gain, and maximum decline. Adjust criteria only after reviewing a useful sample,
    not after one winner or loser.
@@ -51,7 +52,7 @@ with workflow:
         },
         {
             "Status": "Processed",
-            "Meaning": "New pair records actually enriched, filtered, scored, and saved.",
+            "Meaning": "Fresh and watched pairs enriched, filtered, and rescored. Only scores at or above the configured threshold are saved.",
         },
         {
             "Status": "Qualified",
@@ -65,8 +66,9 @@ with workflow:
     st.dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
 
     st.info(
-        "A low Processed count is not necessarily an error. Redis ignores recently processed "
-        "pairs so they are not repeatedly analyzed or alerted."
+        "Redis keeps low-score tokens on a temporary watchlist so later scans can promote them "
+        "if their market data improves. PostgreSQL stores only tokens at or above the configured "
+        "score threshold; Discord additionally requires every hard filter to pass."
     )
 
 with table_guide:
