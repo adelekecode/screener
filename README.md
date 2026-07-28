@@ -112,11 +112,12 @@ bound for the configured recent-activity threshold.
 Freshly discovered tokens remain on a Redis watchlist for at least the configured
 pair-age window and are rescored on each scheduled scan. A token that starts
 below the threshold can therefore be promoted later if its data improves.
-PostgreSQL stores only candidates whose score meets `minimum_score_for_alert`
-(70 by default). Passing that score controls persistence; Discord still requires
-the candidate to pass every hard safety filter. Historical rows linked to an
-alert are retained even if the threshold is later raised. An unalerted token
-that later falls below the threshold is removed from the opportunity table.
+`minimum_score_for_alert` (70 by default) is the entry gate for new PostgreSQL
+opportunities. Once admitted, a pair remains permanently tracked: every scan
+refreshes its price, market cap, liquidity, volume, transactions, checks, score,
+qualification state, and `last_seen_at`, even if its later score falls below 70.
+Discord still requires every hard safety filter unless the operator uses the
+manual monitor override.
 
 Unavailable data is never converted to a safe result — see
 [Why Screener is built this way](#why-screener-is-built-this-way) above.

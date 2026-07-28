@@ -66,3 +66,10 @@ async def test_rediscovery_does_not_extend_original_watch_window() -> None:
 
     assert scanner.redis.values["known-token"] == original_expiry
 
+
+def test_score_threshold_is_entry_gate_but_tracked_pairs_are_retained() -> None:
+    tracked = {"tracked-pair"}
+
+    assert ScannerService._should_persist("new-high", tracked, 70, 70)
+    assert not ScannerService._should_persist("new-low", tracked, 69, 70)
+    assert ScannerService._should_persist("tracked-pair", tracked, 42, 70)

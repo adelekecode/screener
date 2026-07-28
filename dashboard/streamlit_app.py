@@ -72,12 +72,14 @@ try:
     if rows:
         frame = pd.DataFrame(rows)
         frame["pair_created_at"] = frame["pair_created_at"].map(humanize_timestamp)
+        frame["last_seen_at"] = frame["last_seen_at"].map(humanize_timestamp)
         recent = frame[
             [
                 "symbol",
                 "score",
                 "qualified",
                 "pair_created_at",
+                "last_seen_at",
                 "market_cap_usd",
                 "liquidity_usd",
                 "volume_5m_usd",
@@ -90,6 +92,7 @@ try:
                 "score": "Score",
                 "qualified": "Qualified",
                 "pair_created_at": "Created",
+                "last_seen_at": "Updated",
                 "market_cap_usd": "Market cap",
                 "liquidity_usd": "Liquidity",
                 "volume_5m_usd": "5m volume",
@@ -104,6 +107,9 @@ try:
             column_config={
                 "Created": st.column_config.TextColumn(
                     help="How long ago DEX Screener reports that the pair was created."
+                ),
+                "Updated": st.column_config.TextColumn(
+                    help="How long ago the scanner refreshed this pair's market data."
                 ),
                 "Market cap": st.column_config.NumberColumn(format="$%.0f"),
                 "Liquidity": st.column_config.NumberColumn(format="$%.0f"),

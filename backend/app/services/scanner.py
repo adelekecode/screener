@@ -81,16 +81,21 @@ class ScannerService:
                     session, "criteria", default={}
                 )
                 criteria = self.settings.load_criteria(criteria_overrides)
+                tracked_pairs = await repositories.list_tracked_pairs(session)
+                tracked_pair_addresses = {
+                    pair_address for pair_address, _ in tracked_pairs
+                }
+                tracked_tokens = [token_address for _, token_address in tracked_pairs]
                 discovered_tokens = await self.dexscreener.discover_solana_tokens()
                 discovered_count = len(discovered_tokens)
-                tokens = await self._tokens_for_scan(
+                watched_tokens = await self._tokens_for_scan(
                     discovered_tokens,
                     watch_minutes=criteria.maximum_pair_age_minutes,
                 )
+                tokens = list(dict.fromkeys([*watched_tokens, *tracked_tokens]))
 
                 candidates = await self._collect_candidates(tokens)
                 checks_by_pair = await self._run_checks(candidates)
-                below_threshold_pairs: list[str] = []
 
                 for candidate in candidates:
                     pair_address = candidate["pair_address"]
@@ -108,7 +113,12 @@ class ScannerService:
                     processed_count += 1
 
                     opportunity = None
-                    if score >= criteria.minimum_score_for_alert:
+                    if self._should_persist(
+                        pair_address,
+                        tracked_pair_addresses,
+                        score,
+                        criteria.minimum_score_for_alert,
+                    ):
                         db_values = self._database_values(
                             candidate,
                             checks=checks,
@@ -122,8 +132,7 @@ class ScannerService:
                         opportunity = await repositories.upsert_opportunity(
                             session, db_values
                         )
-                    else:
-                        below_threshold_pairs.append(pair_address)
+                        tracked_pair_addresses.add(pair_address)
 
                     if qualified:
                         qualified_count += 1
@@ -152,18 +161,6 @@ class ScannerService:
                                     "1",
                                     ex=self.settings.processed_ttl_seconds,
                                 )
-
-                removed_count = await repositories.delete_below_score_without_alerts(
-                    session,
-                    criteria.minimum_score_for_alert,
-                    current_below_threshold=below_threshold_pairs,
-                )
-                if removed_count:
-                    logger.info(
-                        "Removed %s stored opportunities below score %s",
-                        removed_count,
-                        criteria.minimum_score_for_alert,
-                    )
 
                 await repositories.finish_scan(
                     session,
@@ -256,6 +253,16 @@ class ScannerService:
             token.decode() if isinstance(token, bytes) else token for token in watched
         ]
         return list(dict.fromkeys([*discovered_tokens, *normalized]))
+
+    @staticmethod
+    def _should_persist(
+        pair_address: str,
+        tracked_pair_addresses: set[str],
+        score: int,
+        minimum_score: int,
+    ) -> bool:
+        """Use the threshold as an entry gate, then keep tracked pairs current."""
+        return pair_address in tracked_pair_addresses or score >= minimum_score
 
     async def _run_checks(
         self, candidates: list[dict[str, Any]]

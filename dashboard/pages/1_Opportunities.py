@@ -70,6 +70,7 @@ for row in rows:
             "Score": row["score"],
             "Qualified": row["qualified"],
             "Created": humanize_timestamp(created),
+            "Updated": humanize_timestamp(row.get("last_seen_at")),
             "Market cap": row["market_cap_usd"],
             "Liquidity": row["liquidity_usd"],
             "5m volume": row["volume_5m_usd"],
@@ -85,6 +86,9 @@ st.dataframe(
     column_config={
         "Created": st.column_config.TextColumn(
             help="How long ago DEX Screener reports that the pair was created."
+        ),
+        "Updated": st.column_config.TextColumn(
+            help="How long ago the scanner refreshed this pair's market data."
         ),
         "Market cap": st.column_config.NumberColumn(format="$%.0f"),
         "Liquidity": st.column_config.NumberColumn(format="$%.0f"),
@@ -173,6 +177,10 @@ def token_carousel() -> None:
         )
     else:
         st.caption("Pair creation time was not supplied by DEX Screener.")
+    st.caption(
+        f"Market data refreshed {humanize_timestamp(item.get('last_seen_at'))} · "
+        f"{friendly_utc_timestamp(item.get('last_seen_at'))}"
+    )
 
     left, right = st.columns(2)
     with left:

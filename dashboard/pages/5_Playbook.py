@@ -52,7 +52,7 @@ with workflow:
         },
         {
             "Status": "Processed",
-            "Meaning": "Fresh and watched pairs enriched, filtered, and rescored. Only scores at or above the configured threshold are saved.",
+            "Meaning": "Fresh, watched, and stored pairs enriched, filtered, and rescored. New pairs enter storage at the configured score threshold.",
         },
         {
             "Status": "Qualified",
@@ -66,9 +66,9 @@ with workflow:
     st.dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
 
     st.info(
-        "Redis keeps low-score tokens on a temporary watchlist so later scans can promote them "
-        "if their market data improves. PostgreSQL stores only tokens at or above the configured "
-        "score threshold; Discord additionally requires every hard filter to pass."
+        "Redis keeps low-score tokens on a temporary watchlist so later scans can promote them. "
+        "The score threshold controls entry into PostgreSQL. Once admitted, a pair is refreshed "
+        "on every scan even if its later score falls; Discord still requires every hard filter."
     )
 
 with table_guide:
@@ -97,6 +97,12 @@ with table_guide:
             "What it is": "The liquidity pair creation timestamp reported by DEX Screener.",
             "How to read it": "Shown as relative time, such as “12 min ago” or “3 hrs ago.”",
             "Watch out for": "This is not necessarily the token mint time; one token can have several pairs.",
+        },
+        {
+            "Column": "Updated",
+            "What it is": "How long ago the scanner last refreshed the stored pair.",
+            "How to read it": "After a successful scan, tracked pairs should show a recent update.",
+            "Watch out for": "A stale value can indicate an upstream API failure or an incomplete scan.",
         },
         {
             "Column": "Market cap",
